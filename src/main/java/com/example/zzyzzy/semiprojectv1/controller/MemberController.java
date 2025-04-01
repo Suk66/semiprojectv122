@@ -2,11 +2,16 @@ package com.example.zzyzzy.semiprojectv1.controller;
 
 import com.example.zzyzzy.semiprojectv1.domain.Member;
 import com.example.zzyzzy.semiprojectv1.domain.MemberDTO;
+import com.example.zzyzzy.semiprojectv1.jwt.JwtTokenProvider;
 import com.example.zzyzzy.semiprojectv1.repository.MemberRepository;
 import com.example.zzyzzy.semiprojectv1.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
@@ -27,6 +32,8 @@ import javax.servlet.http.HttpSession;
 public class MemberController {
 
     private final MemberService memberService;
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @GetMapping("/join")
     public String join() {
@@ -64,6 +71,42 @@ public class MemberController {
         return "views/member/login";
     }
 
+    @PostMapping("/login")
+    public ResponseEntity<?> loginok(MemberDTO member, HttpServletResponse res ) {
+        ResponseEntity<?> response = ResponseEntity.internalServerError().body("서버처리시 오류 발생!");
+
+        log.info("submit 된 로그인 정보 : {}", member);
+
+
+            try {
+                // 스프링 시큐리티에서 제공하는 인증처리 매니저로 인증 처리
+                authenticationManager.authenticate(
+                        new UsernamePasswordAuthenticationToken(member.getUserid(), member.getPasswd())
+                );
+
+                // 인증이 완료되면 jwt 토큰 생성
+                final String jwt = jwtTokenProvider.generateToken(member.getUserid());
+
+                // JWT 토큰을 쿠키에 저장
+                Cookie cookie = new Cookie("jwt", jwt);
+                cookie.setHttpOnly(true); // 토큰은 header를 통해서만 서버로 전송가능
+                cookie.setMaxAge(60 * 30); // 유효시간 30분
+                cookie.setPath("/");
+                res.addCookie(cookie);
+
+                response = ResponseEntity.ok().body("로그인 성공했습니다!!");
+            } catch (BadCredentialsException e) {
+                // 인증 실패시 상태코드 401으로 응답 - 아이디나 비밀번호 잘못 입력시
+                response = ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("아이디나 비밀번호를 확인하세요!!");
+                log.info(e.getMessage());
+            } catch (Exception e) {
+                // 비정상 처리시 상태코드 500으로 응답 - 서버 잘못
+                log.info(e.getMessage());
+            }
+        return response;
+    }
+
 
     @GetMapping("/logout")
     public String logout(HttpServletRequest req, HttpServletResponse res) {
@@ -81,7 +124,20 @@ public class MemberController {
         return "redirect:/";
     }
 
+    @GetMapping("/myinfo")
+    public String myinfo(Authentication authentication, Model model) {
+        String returnUrl = "views/member/login";
 
+        // 로그인 인증이 성공했다면
+        if (authentication != null && authentication.isAuthenticated()) {
+            // 인증 완료된 사용자 정보(아이디)를 가져옴
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            // 그외 사용자 정보(이름,이메일,가입일)를 가져오기 위해 다시 사용자 테이블 조회
+            model.addAttribute("loginUser", memberService.findByUserid(userDetails));
+            returnUrl = "views/member/myinfo";
+        }
+        return returnUrl;
+    }
 
     // 스프링 시큐리티가 자동으로 처리 - 생략
 //    @PostMapping("/login")
@@ -110,23 +166,6 @@ public class MemberController {
 //
 //        return response;
 //    }
-    
-    @GetMapping("/myinfo")
-    public String myinfo(Authentication authentication, Model model) {
-        String returnUrl = "views/member/login";
-
-        // 로그인 인증이 성공했다면
-        if (authentication != null && authentication.isAuthenticated()) {
-            // 인증 완료된 사용자 정보(아이디)를 가져옴
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            // 그외 사용자 정보(이름,이메일,가입일)를 가져오기 위해 다시 사용자 테이블 조회
-            model.addAttribute("loginUser", memberService.findByUserid(userDetails));
-            returnUrl = "views/member/myinfo";
-        }
-
-        return returnUrl;
-    }
-
     // 스프링 시큐리티가 자동으로 처리 - 생략
 //    @GetMapping("/logout")
 //    public String logout(HttpSession session) {
