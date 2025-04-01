@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 @Slf4j
@@ -60,6 +63,25 @@ public class MemberController {
     public String login() {
         return "views/member/login";
     }
+
+
+    @GetMapping("/logout")
+    public String logout(HttpServletRequest req, HttpServletResponse res) {
+
+        Cookie cookie = new Cookie("jwt", null);
+        cookie.setMaxAge(0);
+        cookie.setPath("/");
+        res.addCookie(cookie);
+
+        // 세션 무효화 (필요한 경우)
+        HttpSession sess = req.getSession(false);
+        if(sess != null) {
+            sess.invalidate();
+        }
+        return "redirect:/";
+    }
+
+
 
     // 스프링 시큐리티가 자동으로 처리 - 생략
 //    @PostMapping("/login")

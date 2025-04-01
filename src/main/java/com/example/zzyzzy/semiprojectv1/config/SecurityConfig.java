@@ -62,6 +62,7 @@ public class SecurityConfig {
 //                .logoutSuccessUrl("/") // 로그아웃 성공후 리다이렉트될 URL
 //                .invalidateHttpSession(true) // 세션 무효화
 //                .deleteCookies("JSESSIONID"); // JSESSIONID 쿠키 삭제
+//        kimhyunsuk 1004
 
         return http.build();
     }
